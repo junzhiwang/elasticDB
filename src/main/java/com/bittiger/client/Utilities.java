@@ -3,6 +3,11 @@ package com.bittiger.client;
 import com.bittiger.logic.Server;
 
 public class Utilities {
+	public static final int retryTimes = 3;
+	
+	public static final int minimumSlave = 3;
+
+	
 	public static String getUrl(Server server) {
 		return "jdbc:mysql://" + server.getIp() + "/tpcw";
 	}

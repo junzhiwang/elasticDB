@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.bittiger.logic.Controller;
+import com.bittiger.logic.Executor;
 import com.bittiger.logic.Monitor;
 
 public class ClientEmulator{
@@ -17,6 +18,7 @@ public class ClientEmulator{
 	private boolean endOfSimulation = false;
 	private Monitor monitor;
 	private Controller controller;
+	private Executor executor;
 	OpenSystemTicketProducer producer;
 	private long startTime;
 
@@ -60,6 +62,8 @@ public class ClientEmulator{
 		}
 		LOG.info("The maximum is : " + maxNumSessions);
 		BlockingQueue<Integer> bQueue = new LinkedBlockingQueue<Integer>();
+		
+		// Each usersession is a user
 		UserSession[] sessions = new UserSession[maxNumSessions];
 		for (int i = 0; i < maxNumSessions; i++) {
 			sessions[i] = new UserSession(i, this, bQueue);
@@ -74,19 +78,22 @@ public class ClientEmulator{
 		long endTime = startTime + warmup + mi + warmdown;
 		long currTime;
 		
-		
+		// producer is for semi-open and open models
+		// it shares a bQueue with all the usersessions.
 		if (tpcw.mixRate > 0) {
 			producer = new OpenSystemTicketProducer(
 					this, bQueue);
 			producer.start();
 		}
 		this.controller = new Controller(this);
+		this.executor = new Executor(this);
 		this.controller.start();
 
 		LOG.info("Client starts......");
 		while (true) {
 			currTime = System.currentTimeMillis();
 			if (currTime >= endTime) {
+				// when it reaches endTime, it ends.
 				break;
 			}
 			diffWL = workloads[currWLInx] - currNumSessions;

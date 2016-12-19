@@ -1,5 +1,5 @@
 package com.bittiger.logic;
 
 public enum ActionType {
-	ScaleOut, ScaleIn
+	AvailNotEnoughAddServer, BadPerformanceAddServer, GoodPerformanceRemoveServer, NoOp
 }

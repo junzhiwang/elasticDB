@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.DriverManager;
 import java.sql.Statement;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,12 +85,12 @@ public class UserSession extends Thread {
 		return sql;
 	}
 
-	private Server computeNextServer(String sql) {
+	private Pair<Server,Connection> getNextConnection(String sql) {
 		if (sql.contains("b")) // read
 		{
-			return client.getController().getNextReadServer();
+			return client.getController().getNextReadConnection();
 		} else {
-			return client.getController().getNextWriteServer();
+			return client.getController().getNextWriteConnection();
 		}
 	}
 
@@ -114,20 +115,15 @@ public class UserSession extends Thread {
 					Thread.sleep((long) ((float) TPCWthinkTime(tpcw.TPCmean)));
 				}
 
-				String queryclass = computeNextSql(tpcw.rwratio,
-						tpcw.read, tpcw.write);
-				Server server = computeNextServer(queryclass);
+				String queryclass = computeNextSql(tpcw.rwratio, tpcw.read,
+						tpcw.write);
+				Pair<Server, Connection> pair = getNextConnection(queryclass);
 				String classname = "com.bittiger.querypool." + queryclass;
 				QueryMetaData query = (QueryMetaData) Class.forName(classname)
 						.newInstance();
 				String command = query.getQueryStr();
-				Class.forName("com.mysql.jdbc.Driver").newInstance();
-				// DriverManager.setLoginTimeout(5);
-				Connection con = DriverManager.getConnection(
-						Utilities.getUrl(server), tpcw.username,
-						tpcw.password);
-				con.setAutoCommit(true);
-				Statement stmt = con.createStatement();
+
+				Statement stmt = pair.getRight().createStatement();
 				if (queryclass.contains("b")) {
 					long start = System.currentTimeMillis();
 					ResultSet rs = stmt.executeQuery(command);
@@ -135,7 +131,7 @@ public class UserSession extends Thread {
 					client.getMonitor().addQuery(this.id, queryclass, start,
 							end);
 					rs.close();
-					client.getController().returnBack(server);
+					client.getController().returnBack(pair.getLeft());
 				} else {
 					long start = System.currentTimeMillis();
 					stmt.executeUpdate(command);
@@ -144,7 +140,7 @@ public class UserSession extends Thread {
 							end);
 				}
 				stmt.close();
-				con.close();
+				pair.getRight().close();
 			} catch (Exception ex) {
 				LOG.error("Error while running session: " + ex.getMessage());
 			}

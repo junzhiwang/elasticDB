@@ -7,14 +7,19 @@ import java.io.InputStreamReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.bittiger.client.ClientEmulator;
+import com.bittiger.client.Utilities;
+
 public class Executor extends Thread {
 
 	Controller controller = null;
-	ActionType actionType = null;
+	EventQueue eventQueue = null;
+	private ClientEmulator c;
 
-	public Executor(Controller controller, ActionType actionType) {
-		this.controller = controller;
-		this.actionType = actionType;
+	public Executor(ClientEmulator c) {
+		this.c = c;
+		this.controller = c.getController();
+		this.eventQueue = c.getController().eventQueue;
 	}
 
 	private static transient final Logger LOG = LoggerFactory
@@ -22,38 +27,50 @@ public class Executor extends Thread {
 
 	@Override
 	public void run() {
-		try {
-			if (this.actionType == ActionType.ScaleOut) {
-				LOG.info("Scale out request received");
-				if (controller.candidateQueue.size() == 0) {
-					LOG.info("CandidateQueue size is 0, skip scale out");
-				} else {
-					Server target = controller.candidateQueue.remove(0);
-					Server source = controller.readQueue
-							.get(controller.readQueue.size() - 1);
-					Server master = controller.writeQueue.get(0);
-					scaleOut(source.getIp(), target.getIp(), master.getIp());
-					controller.addServer(target);
-					LOG.info("kick in " + target.getIp() + " done ");
-				}
-				LOG.info("Scale out request done");
-				this.controller.setActionType(null);
-			} else {
-				LOG.info("Scale in request received");
-				if (controller.readQueue.size() == 2) {
-					LOG.info("Read queue size is 2, skip scale in");
-				} else {
-					Server server = controller.removeServer();
-					LOG.info("Kick out server" + server.getIp());
-					scaleIn(server.getIp());
-				}
-				LOG.info("Scale in request done");
-				this.controller.setActionType(null);
+		LOG.info("Executor starts......");
+		while (true) {
+			ActionType actionType = eventQueue.peek();
+			long currTime = System.currentTimeMillis();
+			if (currTime > c.getStartTime() + c.getTpcw().warmup
+					+ c.getTpcw().mi) {
+				return;
 			}
-		} catch (Exception e) {
-			LOG.error(e.getMessage());
+			try {
+				LOG.info(actionType + " request received");
+				if (actionType == ActionType.AvailNotEnoughAddServer
+						|| actionType == ActionType.BadPerformanceAddServer) {
+					if (controller.candidateQueue.size() == 0) {
+						LOG.info("CandidateQueue size is 0, skip adding server");
+					} else {
+						Server target = controller.candidateQueue.remove(0);
+						Server source = controller.readQueue
+								.get(controller.readQueue.size() - 1);
+						Server master = controller.writeQueue;
+						// make sure source ! = master
+						if(source.equals(master)){
+							LOG.error("source should not be equal to master");
+							continue;
+						}
+						scaleOut(source.getIp(), target.getIp(), master.getIp());
+						controller.addServer(target);
+						LOG.info("kick in " + target.getIp() + " done ");
+					}
+				} else if (actionType == ActionType.GoodPerformanceRemoveServer) {
+					if (controller.readQueue.size() == Utilities.minimumSlave) {
+						LOG.info("Read queue size is " + Utilities.minimumSlave
+								+ ", skip scale in");
+					} else {
+						Server server = controller.removeServer();
+						scaleIn(server.getIp());
+						LOG.info("Kick out server" + server.getIp() + " done ");
+					}
+				}
+				LOG.info(actionType + " request done");
+				eventQueue.get();
+			} catch (Exception e) {
+				LOG.error(e.getMessage());
+			}
 		}
-
 	}
 
 	public boolean scaleOut(String source, String target, String master)
