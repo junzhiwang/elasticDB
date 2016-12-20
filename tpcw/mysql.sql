@@ -2,6 +2,7 @@ GRANT ALL ON *.* TO 'root'@'%' IDENTIFIED BY 'TigerBit!2016';
 FLUSH PRIVILEGES;
 
 drop database if exists tpcw;
+purge binary logs before now();
 create database tpcw;
 
 drop database if exists canvasjs_db;

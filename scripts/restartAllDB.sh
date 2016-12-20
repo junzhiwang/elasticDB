@@ -8,6 +8,14 @@ echo "MYSQL_HOME is set to $MYSQL_HOME"
 
 source $SCRIPT_HOME/set_env.sh
 
+echo "step 0 clean master"
+for target in $MASTER
+do
+echo "clean DB in $MASTER"
+ssh root@$MASTER "/etc/init.d/mysql start"
+ssh root@$target "$SCRIPT_HOME/cleanDB.sh"
+done
+
 echo "step 1 stop master/slave process"
 ssh root@$MASTER "/etc/init.d/mysql stop"
 
@@ -20,6 +28,7 @@ done
 echo "step 2 initialize master"
 for target in $MASTER
 do
+echo "init $MASTER"
 ssh root@$target "$SCRIPT_HOME/initMaster.sh 1"
 ssh root@$target "mysql --user="$MYSQL_USERNAME" --password="$MYSQL_PASSWORD" < $SCRIPT_HOME/grantMaster.sql"
 done
@@ -43,6 +52,7 @@ servernum=$(echo $i+2 | bc)
 ssh root@$target "$SCRIPT_HOME/initSlave.sh $MASTER `expr $servernum`"
 ssh root@$target "mysql --user="$MYSQL_USERNAME" --password="$MYSQL_PASSWORD" < $SCRIPT_HOME/grantSlave.sql"
 ssh root@$target "rm -rf $SCRIPT_HOME/grantSlave.sql"
+echo "$target restarts"
 done
 
 rm -rf $SCRIPT_HOME/grantSlave.sql

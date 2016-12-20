@@ -8,7 +8,7 @@ echo "MYSQL_HOME is set to $MYSQL_HOME"
 
 source $SCRIPT_HOME/set_env.sh
 
-mysql --user="$MYSQL_USERNAME" --password="MYSQL_PASSWORD" < /home/ubuntu/elasticDB/tpcw/mysql.sql
+mysql --user="$MYSQL_USERNAME" --password="$MYSQL_PASSWORD" < /home/ubuntu/elasticDB/tpcw/mysql.sql
 
 echo "clean mysql done"
 
@@ -16,3 +16,4 @@ cd /home/ubuntu/java-tpcw
 
 ant gendb
 
+mysql --user="$MYSQL_USERNAME" --password="$MYSQL_PASSWORD" -e "purge binary logs before now();" 
